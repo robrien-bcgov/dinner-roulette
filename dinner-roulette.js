@@ -51,7 +51,8 @@ function chooseRecipe(links) {
     if (!link.href || link.ad) return [];
     const href = unwrap(link.href);
     try {
-      if (excludedHost.test(new URL(href).hostname)) return [];
+      const url = new URL(href);
+      if (!['http:', 'https:'].includes(url.protocol) || excludedHost.test(url.hostname)) return [];
     } catch {
       return [];
     }
