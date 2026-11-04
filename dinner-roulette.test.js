@@ -259,6 +259,24 @@ test('quits cleanly while the recipe is still scrolling', async ({ context }) =>
   }
 });
 
+test('recovers when the recipe tab closes while scrolling', async ({ context }) => {
+  const app = await startDinner(context);
+  try {
+    await expect.poll(() => app.messages.some((message) => message.startsWith('Recipe:'))).toBe(true);
+    const recipePage = context.pages().find((page) => page !== app.searchPage);
+    await expect.poll(() => recipePage.evaluate(() => globalThis.scrollY)).toBeGreaterThan(0);
+    await recipePage.close();
+    await app.waitForDinner(1);
+
+    app.input.write('r\n');
+    await app.waitForDinner(2);
+    expect(context.pages()).toHaveLength(2);
+    expect(app.errors).toEqual([]);
+  } finally {
+    await app.cleanup();
+  }
+});
+
 test('resolves opaque Google redirects before filtering recipe destinations', { tag: '@unit' }, async () => {
   const destinations = new Map([
     ['https://www.google.com/goto?url=opaque-pinterest', 'https://www.pinterest.com/recipe'],

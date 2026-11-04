@@ -238,7 +238,7 @@ async function main({ browserType = chromium, input = process.stdin, output = pr
       await showDinner();
     } catch (error) {
       if (closing) return;
-      throw error;
+      if (!recipePage?.isClosed() || !error.message?.includes('Target page, context or browser has been closed')) throw error;
     }
     log('Click Reroll dinner or type r and press Enter to reroll. Type q and press Enter to quit.');
     await reroll.wait();
