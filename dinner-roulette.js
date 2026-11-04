@@ -112,7 +112,12 @@ async function searchRecipe(page, idea) {
     console.log('Complete the Google browser check in Edge to continue.');
     await page.waitForURL(/\/search\?/, { timeout: 120000 });
   }
-  await page.locator('#rso a[href], #search a[href]').first().waitFor({ state: 'visible', timeout: 20000 });
+  try {
+    await page.locator('#rso a[href], #search a[href]').first().waitFor({ state: 'visible', timeout: 20000 });
+  } catch (error) {
+    if (error.name !== 'TimeoutError') throw error;
+    return [];
+  }
   return page.locator('#rso a, #search a').evaluateAll((anchors) => anchors.slice(0, 40).map((anchor) => ({
     href: anchor.href,
     text: (anchor.innerText || anchor.getAttribute('aria-label') || '').trim(),

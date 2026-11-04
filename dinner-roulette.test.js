@@ -112,7 +112,7 @@ test.describe('core logic', { tag: '@unit' }, () => {
   });
 });
 
-async function startDinner(context, { delayedResults = false, noRecipe = false, noIngredients = false, browserCheck = false, holdNavigation = false } = {}) {
+async function startDinner(context, { delayedResults = false, noRecipe = false, noResultLinks = false, noIngredients = false, browserCheck = false, holdNavigation = false } = {}) {
   await context.route('**/*', async (route) => {
     const url = new URL(route.request().url());
     if (url.hostname === 'www.google.com') {
@@ -120,7 +120,7 @@ async function startDinner(context, { delayedResults = false, noRecipe = false, 
         return route.fulfill({ contentType: 'text/html', body: `<a href="/search?q=${encodeURIComponent(url.searchParams.get('q'))}&checked=1">Continue</a>` });
       }
       const results = url.pathname === '/search'
-        ? noRecipe ? '<div id="rso"><a href="https://www.pinterest.com/recipe">Pinterest recipe</a></div>' : `<div id="rso">
+        ? noResultLinks ? '<div id="rso"></div>' : noRecipe ? '<div id="rso"><a href="https://www.pinterest.com/recipe">Pinterest recipe</a></div>' : `<div id="rso">
             <div id="tads"><a href="https://ads.test/recipe">Sponsored recipe</a></div>
             <a href="https://www.pinterest.com/recipe">Pinterest recipe</a>
             <a href="https://recipe.test/best-recipes">Best dinner ideas</a>
@@ -293,6 +293,28 @@ test('allows rerolling when no suitable recipe is found', async ({ context }) =>
     expect(context.pages()).toHaveLength(1);
     await app.searchPage.getByRole('button', { name: 'Reroll dinner' }).click();
     await app.waitForDinner(2);
+    expect(new Set(app.messages.filter((message) => message.startsWith('Tonight:'))).size).toBe(2);
+  } finally {
+    await app.cleanup();
+  }
+});
+
+test('allows rerolling when the results page has no recipe links', async ({ context }) => {
+  test.setTimeout(60000);
+  const app = await startDinner(context, { noResultLinks: true });
+  try {
+    await expect.poll(
+      () => app.errors[0]?.message || app.messages.filter((message) => message.startsWith('Click Reroll dinner')).length,
+      { timeout: 30000 },
+    ).toBe(1);
+    expect(app.errors).toEqual([]);
+    expect(app.messages).toContain('No recipe on this results page.');
+    app.input.write('r\n');
+    await expect.poll(
+      () => app.errors[0]?.message || app.messages.filter((message) => message.startsWith('Click Reroll dinner')).length,
+      { timeout: 30000 },
+    ).toBe(2);
+    expect(app.errors).toEqual([]);
     expect(new Set(app.messages.filter((message) => message.startsWith('Tonight:'))).size).toBe(2);
   } finally {
     await app.cleanup();
