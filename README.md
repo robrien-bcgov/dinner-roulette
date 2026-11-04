@@ -2,6 +2,10 @@
 
 A Node.js script that chooses a weeknight meal, searches Google for a recipe, opens a likely result in Microsoft Edge, and scrolls toward its ingredients. Meal ideas are selected without repeats until they have all been used.
 
+![Dinner Roulette displaying a recipe with its text blurred, photos preserved, and the Reroll dinner button visible at the bottom-right.](docs/images/dinner-roulette.png)
+
+Dinner Roulette in action on a [Pick Up Limes recipe](https://www.pickuplimes.com/recipe/creamy-tomato-chickpea-curry-2924).
+
 ## Requirements
 
 - Node.js 18 or newer
