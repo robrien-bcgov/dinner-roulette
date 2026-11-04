@@ -37,6 +37,15 @@ test.describe('core logic', { tag: '@unit' }, () => {
       expected: 'https://www.seriouseats.com/chili',
     },
     {
+      name: 'ignores non-HTTP(S) recipe links',
+      links: [
+        { href: 'javascript:void(0)', text: 'Recipe' },
+        { href: 'mailto:recipe@food.test', text: 'Recipe' },
+        { href: 'https://food.test/recipe', text: 'Recipe' },
+      ],
+      expected: 'https://food.test/recipe',
+    },
+    {
       name: 'rejects malformed, missing, sponsored, social, and non-recipe listicle links',
       links: [
         {},
