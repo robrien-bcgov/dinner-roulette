@@ -1,3 +1,15 @@
+/**
+ * Picks dinner ideas, searches Google for a likely recipe, and opens it in Edge.
+ *
+ * Run with `npm run dinner` or `node dinner-roulette.js`. Importing this module
+ * exposes the helpers below without starting a browser. The browser uses a
+ * persistent profile at `~/.cache/playwright-edge-google`; run only one copy
+ * at a time, and complete any Google browser check in the opened window.
+ *
+ * @example
+ * npm run dinner
+ * @module dinner-roulette
+ */
 'use strict';
 
 const os = require('node:os');
@@ -24,11 +36,23 @@ const ideas = [
 ];
 let remaining = [];
 
+/**
+ * Draws a meal without repeats until all ideas have been used.
+ *
+ * @returns {string} The next meal idea.
+ */
 function nextIdea() {
   if (remaining.length === 0) remaining = [...ideas];
   return remaining.splice(Math.floor(Math.random() * remaining.length), 1)[0];
 }
 
+/**
+ * Extracts the destination from a Google `/url` redirect when available.
+ *
+ * @param {string} href URL to unwrap.
+ * @returns {string} The destination URL, or the original value if it is not a
+ * Google redirect or cannot be parsed.
+ */
 function unwrap(href) {
   try {
     const url = new URL(href);
@@ -46,6 +70,14 @@ const recipeWords = /\b(recipe|recipes|cooking|ingredients)\b/i;
 const recipeSites = /allrecipes|seriouseats|bonappetit|food52|epicurious|simplyrecipes|budgetbytes|bbcgoodfood|cooking\.nytimes|thekitchn|skinnytaste|recipetineats|loveandlemons|cookieandkate|minimalistbaker|halfbakedharvest|foodnetwork|delish|tasty\.co|eatingwell|smittenkitchen/i;
 const listicleWords = /\b(best|ideas|roundup|ranked|ways to)\b/i;
 
+/**
+ * Selects the best recipe-like result, excluding ads, unsupported URLs, and
+ * known non-recipe hosts.
+ *
+ * @param {{href?: string, text?: string, ad?: boolean}[]} links Search results.
+ * @returns {{href: string, text: string, ad?: boolean}|null} The selected link,
+ * or `null` when no candidate remains.
+ */
 function chooseRecipe(links) {
   const candidates = links.flatMap((link) => {
     if (!link.href || link.ad) return [];
@@ -67,6 +99,16 @@ function chooseRecipe(links) {
     || null;
 }
 
+/**
+ * Resolves Google's opaque `/goto` result links without following redirects.
+ *
+ * @param {import('@playwright/test').Page} page Page whose API request context
+ * is used to inspect redirects.
+ * @param {{href?: string, text?: string, ad?: boolean}[]} links Search results.
+ * @returns {Promise<{href?: string, text?: string, ad?: boolean}[]>} Results
+ * with resolved destination URLs when available; failed or unsupported links
+ * remain intact.
+ */
 async function resolveGoogleLinks(page, links) {
   return Promise.all(links.map(async (link) => {
     if (!link.href || link.ad) return link;
@@ -83,6 +125,13 @@ async function resolveGoogleLinks(page, links) {
   }));
 }
 
+/**
+ * Accepts a visible consent button if one appears.
+ *
+ * @param {import('@playwright/test').Page} page Page to inspect.
+ * @returns {Promise<void>} Resolves after clicking a matching button or finding
+ * none within the wait period.
+ */
 async function dismissConsent(page) {
   const buttons = [
     page.locator('#L2AGLb'),
@@ -99,6 +148,14 @@ async function dismissConsent(page) {
   }
 }
 
+/**
+ * Searches Google for a meal and collects up to 40 result links.
+ *
+ * @param {import('@playwright/test').Page} page Search page.
+ * @param {string} idea Meal idea to search for.
+ * @returns {Promise<{href: string, text: string, ad: boolean}[]>} Search
+ * results, or an empty array if no result link becomes visible.
+ */
 async function searchRecipe(page, idea) {
   await page.goto('https://www.google.com', { waitUntil: 'domcontentloaded' });
   await dismissConsent(page);
@@ -126,6 +183,12 @@ async function searchRecipe(page, idea) {
   })));
 }
 
+/**
+ * Scrolls toward an Ingredients heading, then down a short distance.
+ *
+ * @param {import('@playwright/test').Page} page Recipe page.
+ * @returns {Promise<void>}
+ */
 async function scrollIngredients(page) {
   const heading = page.getByRole('heading', { name: /ingredients/i }).first();
   try {
@@ -141,6 +204,14 @@ async function scrollIngredients(page) {
   }
 }
 
+/**
+ * Creates a one-slot signal for reroll requests.
+ *
+ * Requests made while no caller is waiting are remembered; repeated requests
+ * coalesce into one. This is used by both the page button and terminal input.
+ *
+ * @returns {{request: () => void, wait: () => Promise<void>}} Signal methods.
+ */
 function createRerollSignal() {
   let pending = false;
   let waiter;
@@ -166,6 +237,20 @@ function createRerollSignal() {
   };
 }
 
+/**
+ * Runs the interactive dinner picker.
+ *
+ * @param {object} [options] Injectable runtime dependencies, primarily for tests.
+ * @param {import('@playwright/test').BrowserType} [options.browserType] Browser
+ * type used to launch the persistent Edge context.
+ * @param {NodeJS.ReadableStream} [options.input] Terminal input stream.
+ * @param {NodeJS.WritableStream} [options.output] Terminal output stream.
+ * @param {(message: string) => void} [options.log] Message logger.
+ * @param {(code?: number) => void} [options.exit] Process exit function called
+ * when the browser context is closed.
+ * @returns {Promise<void>} Resolves when the interactive loop ends; browser,
+ * navigation, or unexpected interaction errors reject the promise.
+ */
 async function main({ browserType = chromium, input = process.stdin, output = process.stdout, log = console.log, exit = process.exit } = {}) {
   const context = await browserType.launchPersistentContext(
     path.join(os.homedir(), '.cache', 'playwright-edge-google'),
